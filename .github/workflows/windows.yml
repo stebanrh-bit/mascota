@@ -1,0 +1,54 @@
+name: Crear Mascota para Windows
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'mascota/**'
+      - 'tools/build_windows.py'
+      - 'run_pet.py'
+      - 'requirements.txt'
+      - 'tests/**'
+      - '.github/workflows/windows.yml'
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Instalar dependencias
+        run: python -m pip install -r requirements.txt pytest==8.4.2 pyinstaller==6.16.0
+      - name: Probar aplicación y renderizador 3D
+        env:
+          QSG_RHI_PREFER_SOFTWARE_RENDERER: '1'
+        run: |
+          python -m pytest -q
+          python -m mascota --smoke-test --capture build/smoke-windows.png
+      - name: Crear ejecutable
+        run: python tools/build_windows.py
+      - name: Verificar recursos del ejecutable
+        env:
+          QSG_RHI_PREFER_SOFTWARE_RENDERER: '1'
+        shell: pwsh
+        run: |
+          $result = Start-Process -FilePath 'dist/Mascota/Mascota.exe' -ArgumentList '--smoke-test', '--capture', 'build/smoke-packaged.png' -Wait -PassThru
+          if ($result.ExitCode -ne 0) { throw "El ejecutable falló con código $($result.ExitCode)" }
+          if (!(Test-Path 'build/smoke-packaged.png')) { throw 'No se generó la captura 3D' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Mascota-Windows
+          path: dist/Mascota/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Pruebas-visuales-Windows
+          path: build/smoke-*.png
+          if-no-files-found: ignore
