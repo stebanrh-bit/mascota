@@ -38,7 +38,7 @@ jobs:
           QSG_RHI_PREFER_SOFTWARE_RENDERER: '1'
         shell: pwsh
         run: |
-          $result = Start-Process -FilePath 'dist/Mascota/Mascota.exe' -ArgumentList '--smoke-test', '--capture', 'build/smoke-packaged.png' -Wait -PassThru
+          $result = Start-Process -FilePath 'dist/Mascota/Mascota.exe' -ArgumentList '--smoke-test', '--pose', 'roaring', '--capture', 'build/smoke-packaged.png' -Wait -PassThru
           if ($result.ExitCode -ne 0) { throw "El ejecutable falló con código $($result.ExitCode)" }
           if (!(Test-Path 'build/smoke-packaged.png')) { throw 'No se generó la captura 3D' }
       - uses: actions/upload-artifact@v4

@@ -4,15 +4,17 @@ import random
 import time
 
 from PySide6.QtCore import QObject, Property, QTimer, Signal, Slot
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QCursor, QGuiApplication
 
-from .domain import CHARACTERS, Preferences, clamp_position
+from .domain import CHARACTERS, Preferences, clamp_position, clean_name
 
 
 class PetController(QObject):
     changed = Signal()
     stateChanged = Signal()
     messageChanged = Signal()
+    expressionChanged = Signal()
+    lookChanged = Signal()
 
     def __init__(self, preferences: Preferences):
         super().__init__()
@@ -28,6 +30,9 @@ class PetController(QObject):
         self._deadline = 0.0
         self._flight_origin = 0
         self._phase = 0.0
+        self._duration = 1.0
+        self._look_x = self._look_y = 0.0
+        self._gaze_tick = 0
         self._status_timer = QTimer(self)
         self._status_timer.setSingleShot(True)
         self._status_timer.timeout.connect(self._restore_message)
@@ -45,7 +50,19 @@ class PetController(QObject):
 
     @Property(str, notify=changed)
     def characterName(self):
-        return CHARACTERS[self.characterId].name
+        return self.preferences.names.get(self.characterId, CHARACTERS[self.characterId].name)
+
+    @Property(float, notify=expressionChanged)
+    def actionProgress(self):
+        return min(1.0, self._phase / self._duration)
+
+    @Property(float, notify=lookChanged)
+    def lookX(self):
+        return self._look_x
+
+    @Property(float, notify=lookChanged)
+    def lookY(self):
+        return self._look_y
 
     @Property(str, notify=changed)
     def characterKind(self):
@@ -109,6 +126,18 @@ class PetController(QObject):
         self.changed.emit()
         self._say(f"¡Hola! Soy {self.characterName}.")
 
+    @Slot(str, result=bool)
+    def renameCharacter(self, value):
+        name = clean_name(value)
+        if not name:
+            self._say("Escribe un nombre para tu compañero.")
+            return False
+        self.preferences.names[self.characterId] = name
+        self._save()
+        self.changed.emit()
+        self._say(f"¡Ahora me llamo {name}!")
+        return True
+
     @Slot()
     def pet(self):
         self._stop_motion()
@@ -137,13 +166,28 @@ class PetController(QObject):
 
     @Slot()
     def fly(self):
+        self._start_action("flying", 3.2)
+        self._say("¡Cuidado, dragón en vuelo!" if self.characterKind == "dragon" else "¡Voy flotando!")
+
+    def _start_action(self, state, duration):
         self._stop_motion()
         if self._window:
             self._flight_origin = self._window.y()
         self._phase = 0.0
-        self._deadline = time.monotonic() + 3.2
-        self._set_state("flying")
-        self._say("¡Cuidado, dragón en vuelo!" if self.characterKind == "dragon" else "¡Voy flotando!")
+        self._duration = duration
+        self._deadline = time.monotonic() + duration
+        self.expressionChanged.emit()
+        self._set_state(state)
+
+    @Slot()
+    def jump(self):
+        self._start_action("jumping", .85)
+        self._say("¡Mira lo que sé hacer!")
+
+    @Slot()
+    def roar(self):
+        self._start_action("roaring", 1.7)
+        self._say("Pequeño… ¡pero peligroso!" if self.characterKind == "dragon" else "¡Un poquito de magia!")
 
     @Slot(bool)
     def setDragging(self, value):
@@ -159,7 +203,7 @@ class PetController(QObject):
     @Slot(bool)
     def setMenuOpen(self, value):
         self._menu_open = value
-        if value:
+        if value and self._state in ("walking", "flying", "jumping", "held"):
             self._stop_motion()
 
     @Slot(int, int)
@@ -188,7 +232,7 @@ class PetController(QObject):
         self._window.setPosition(x, y)
 
     def _stop_motion(self):
-        if self._state == "flying" and self._window:
+        if self._state in ("flying", "jumping") and self._window:
             self._window.setY(self._flight_origin)
         self._set_state("idle")
         self._next_action = time.monotonic() + 8
@@ -197,14 +241,25 @@ class PetController(QObject):
         now = time.monotonic()
         elapsed = min(now - self._last_tick, .1)
         self._last_tick = now
+        self._gaze_tick = (self._gaze_tick + 1) % 3
+        if self._window and self._gaze_tick == 0:
+            cursor = QCursor.pos()
+            x = max(-1.0, min(1.0, (cursor.x() - self._window.x() - self._window.width()/2) / 250))
+            y = max(-1.0, min(1.0, (self._window.y() + 160 - cursor.y()) / 200))
+            if abs(x-self._look_x) + abs(y-self._look_y) > .02:
+                self._look_x, self._look_y = x, y
+                self.lookChanged.emit()
         if self._dragging or self._menu_open or not self._window:
             return
-        if self._state in ("happy", "walking", "flying") and now >= self._deadline:
+        if self._state in ("happy", "walking", "flying", "jumping", "roaring") and now >= self._deadline:
             self._stop_motion()
-        if self._state == "flying":
+        if self._state in ("flying", "jumping", "roaring"):
             self._phase += elapsed
-            self._window.setY(self._flight_origin - round(65 * math.sin(min(self._phase / 3.2, 1) * math.pi)))
-            self._clamp()
+            self.expressionChanged.emit()
+            if self._state != "roaring":
+                height = 65 if self._state == "flying" else 45
+                self._window.setY(self._flight_origin - round(height * math.sin(self.actionProgress * math.pi)))
+                self._clamp()
         elif self._state == "walking":
             old_x = self._window.x()
             self._window.setX(old_x + self._direction * max(1, round(45 * elapsed)))

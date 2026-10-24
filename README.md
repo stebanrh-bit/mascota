@@ -2,9 +2,11 @@
 
 Un pequeño compañero **3D real** para el escritorio: **Sombra**, un dragón bebé de cuerpo negro, alas azules y dos pequeños colmillos. Esta primera versión funciona sin cuentas, claves de API ni conexión a Internet después de instalar sus dependencias.
 
-El personaje del prototipo está construido con geometría 3D y articulaciones animadas. Las imágenes de `assets/` son referencias de diseño: el modelo actual es más sencillo y todavía no reproduce sus escamas detalladas.
+El personaje del prototipo está construido con geometría 3D y articulaciones animadas. La versión **0.2** añade alas suaves, cuernos y cola curvos, escamas en la frente, parpadeo y ojos que siguen el cursor. Las imágenes de `assets/` son referencias de diseño: el modelo actual es más sencillo y todavía no reproduce sus escamas detalladas.
 
 ![Captura real del prototipo Sombra](docs/prototipo-sombra.png)
+
+[Ver la llamarada azul del modelo 3D](docs/prototipo-llamarada.png).
 
 ## Probar en Windows 11
 
@@ -24,10 +26,13 @@ La mascota aparece sobre el escritorio, con fondo transparente y sin bordes. Par
 | Dormir / despertar | Botón **Dormir** / **Despertar** |
 | Cambiar de personaje | Botón **Personajes** o clic derecho |
 | Volar | Clic derecho → **Volar un ratito** |
+| Saltar | Clic derecho → **Dar un salto** |
+| Llamarada / magia | Clic derecho → **Lanzar llama azul** / **Hacer magia** |
+| Ponerle un nombre | Clic derecho → **Cambiar su nombre** |
 | Activar / desactivar paseos | Clic derecho → **Pasear por el escritorio** |
 | Recuperar la posición | Clic derecho → **Volver al centro** |
 
-Incluye **Sombra** (dragón negro y azul), **Brote** (dragón verde) y **Nimbo** (espíritu flotante). Puedes cambiar sin reiniciar la aplicación. La selección y la preferencia de paseos se guardan localmente en la carpeta de configuración de tu usuario.
+Incluye **Sombra** (dragón negro y azul), **Brote** (dragón verde) y **Nimbo** (espíritu flotante). Puedes cambiar sin reiniciar la aplicación. Cada personaje conserva su propio nombre, de hasta 24 caracteres. Los nombres, la selección y la preferencia de paseos se guardan localmente en la carpeta de configuración de tu usuario. La llamarada es una animación visual, todavía sin sonido.
 
 ## Ejecutable portable para Windows
 
@@ -59,15 +64,16 @@ Para probar sin una pantalla física en el entorno cloud Debian:
 bash tools/setup-cloud.sh
 .venv/bin/python tools/headless.py .venv/bin/python -m pytest -q
 .venv/bin/python tools/headless.py .venv/bin/python -m mascota --smoke-test --capture .local/captura.png
+.venv/bin/python tools/headless.py .venv/bin/python -m mascota --pose roaring --capture .local/llamarada.png
 ```
 
 `tools/headless.py` crea una pantalla Xvfb solo durante el comando, usa Mesa/OpenGL y la cierra al terminar. No expone puertos de red. `setup-headless.sh` descarga Xvfb desde los repositorios Debian verificados y lo extrae en `/workspace/.cache`, sin instalar paquetes en el sistema. El archivo de dependencias y el código no se modifican durante el setup.
 
-Las pruebas de interfaz comprueban renderizado 3D, giro, clics del menú, selección persistente, sueño, caricias, arrastre y límites del escritorio. En Linux sin pantalla se omiten esas tres pruebas; usa el comando con `headless.py` para ejecutarlas.
+Las pruebas de interfaz comprueban renderizado 3D, giro, clics del menú, selección persistente, sueño, caricias, arrastre, salto, llamarada, escritura de nombres, parpadeo, mirada y límites del escritorio. También se validan los límites y las normales de las mallas curvas. En Linux sin pantalla se omiten las seis pruebas de interfaz; usa el comando con `headless.py` para ejecutarlas.
 
 ## Alcance de esta versión
 
-- Animación procedural de respiración, patas, cabeza, cola y alas; sueño, caricias y vuelo corto.
+- Animación procedural de respiración, parpadeo, mirada, patas, cabeza, cola y alas; sueño, caricias, saltos, llamarada y vuelo corto.
 - Ventana transparente sobre el escritorio y paseos dentro del área útil del monitor actual.
 - Tres personajes y preferencias locales, sin conexiones a servicios externos.
 - Preparación de paquete Windows con PyInstaller.

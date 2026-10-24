@@ -39,3 +39,33 @@ def test_invalid_preferences_recover_without_overwriting_file(tmp_path, content)
 ])
 def test_visible_position_on_multiple_monitors(position, size, bounds, expected):
     assert clamp_position(*position, *size, bounds) == expected
+
+
+@pytest.mark.parametrize('value,expected', [
+    ('  Bruma  ', 'Bruma'), ('', ''), (' \t\n ', ''),
+    ('A' * 30, 'A' * 24), ('Dragón 🐉', 'Dragón 🐉'),
+    ('A\x00zul\u202e', 'Azul'), (['Sombra'], ''),
+])
+def test_personal_names_are_safe_single_line(value, expected):
+    from mascota.domain import clean_name
+    assert clean_name(value) == expected
+
+
+def test_old_settings_still_load_and_names_are_independent(tmp_path):
+    path = tmp_path / 'preferences.json'
+    path.write_text('{"character":"brote","roaming":false}', encoding='utf-8')
+    settings = Preferences(path)
+    assert settings.character == 'brote'
+    assert settings.names == {}
+    settings.names = {'sombra': 'Bruma', 'nimbo': 'Luna'}
+    settings.save()
+    restored = Preferences(path)
+    assert restored.names == {'sombra': 'Bruma', 'nimbo': 'Luna'}
+    assert restored.character == 'brote'
+    assert restored.roaming is False
+
+
+def test_invalid_saved_names_do_not_break_startup(tmp_path):
+    path = tmp_path / 'preferences.json'
+    path.write_text('{"names":{"sombra":[],"nimbo":"  Luna  ","unknown":"X"}}')
+    assert Preferences(path).names == {'nimbo': 'Luna'}

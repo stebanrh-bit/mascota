@@ -10,6 +10,13 @@ Node {
     property color bellyColor: "#242938"
     property color accentColor: "#1368dd"
     property color eyeColor: "#50d9ff"
+    property real lookX: 0
+    property real lookY: 0
+    property real actionProgress: 0
+    property real blink: asleep || clock % 5.8 > 5.62 ? .06 : 1
+    Behavior on blink { NumberAnimation { duration: 65 } }
+    Behavior on lookX { NumberAnimation { duration: 100 } }
+    Behavior on lookY { NumberAnimation { duration: 100 } }
     readonly property bool asleep: mood === "sleeping"
     readonly property real step: mood === "walking" ? Math.sin(clock * 9) : 0
     readonly property real flap: Math.sin(clock * (mood === "flying" ? 13 : 2))
@@ -62,28 +69,15 @@ Node {
             Orb { y: -20; z: 12; scale: Qt.vector3d(.34, .27, .32); tint: dragon.bodyColor }
         }
     }
-    // Curling tail: a chain of shaded 3D volumes, swaying from the hip.
+    // Continuous curved mesh, animated from the hip.
     Node {
         x: -35; y: -66; z: -35
         eulerRotation.y: Math.sin(dragon.clock * 2) * 7
-        Repeater3D {
-            model: 9
-            Node {
-                required property int index
-                x: -index * 11
-                y: index * index * 1.1
-                z: -Math.sin(index * .35) * 22
-                Orb {
-                    scale: Qt.vector3d(.43 - index * .035, .40 - index * .032, .45 - index * .035)
-                    tint: dragon.bodyColor
-                }
-                Horn {
-                    y: 15 - index
-                    scale: Qt.vector3d(.12 - index * .008, .24 - index * .014, .13 - index * .009)
-                    tint: dragon.accentColor
-                }
-            }
+        Model {
+            geometry: TailGeometry {}
+            materials: PrincipledMaterial { baseColor: dragon.bodyColor; roughness: .4 }
         }
+        Horn { x: -112; y: 44; z: -6; scale: Qt.vector3d(.15,.28,.15); eulerRotation.z: 20; tint: dragon.accentColor }
     }
     // Jointed wings: independently animated, not a flat image of the pet.
     Repeater3D {
@@ -91,9 +85,11 @@ Node {
         Node {
             required property int index
             readonly property real side: index === 0 ? -1 : 1
+            property real fold: dragon.asleep ? 64 : 12
+            Behavior on fold { NumberAnimation { duration: 260; easing.type: Easing.InOutQuad } }
             x: side * 44; y: 10; z: -30
             scale.x: side
-            eulerRotation.y: (dragon.asleep ? 64 : 12) + dragon.flap * (dragon.mood === "flying" ? 28 : 5)
+            eulerRotation.y: fold + dragon.flap * (dragon.mood === "flying" ? 28 : 5)
             eulerRotation.z: dragon.asleep ? -20 : 0
             Model {
                 geometry: WingGeometry {}
@@ -105,17 +101,8 @@ Node {
                 }
             }
             Model {
-                source: "#Cylinder"
-                x: 36; y: 43; z: -7
-                scale: Qt.vector3d(.065, 1.12, .065)
-                eulerRotation.z: -34
-                materials: PrincipledMaterial { baseColor: dragon.bodyColor; roughness: .3 }
-            }
-            Model {
-                source: "#Cylinder"
-                x: 91; y: 58; z: -14
-                scale: Qt.vector3d(.05, .88, .05)
-                eulerRotation.z: 44
+                z: 8
+                geometry: WingFrameGeometry {}
                 materials: PrincipledMaterial { baseColor: dragon.bodyColor; roughness: .3 }
             }
             Horn { x: 68; y: 98; z: -12; scale: Qt.vector3d(.11, .25, .12); tint: dragon.bodyColor }
@@ -127,9 +114,24 @@ Node {
         y: 74; z: 14
         eulerRotation.x: dragon.asleep ? 17 : -3 + Math.sin(dragon.clock * 1.3) * 2
         eulerRotation.z: dragon.mood === "held" ? -12 : 0
+        eulerRotation.y: dragon.asleep ? 0 : dragon.lookX * 6
         Orb { scale: Qt.vector3d(1.58, 1.27, 1.14); tint: dragon.bodyColor }
         Orb { y: -25; z: 48; scale: Qt.vector3d(1.05, .61, .65); tint: dragon.bodyColor }
         Orb { y: -37; z: 62; scale: Qt.vector3d(.63, .17, .35); tint: "#090b12" }
+        Repeater3D {
+            model: 18
+            Orb {
+                required property int index
+                readonly property real angle: (index % 6 - 2.5) * .3
+                readonly property real row: Math.floor(index / 6)
+                x: Math.sin(angle) * 71
+                y: 29 + row * 10
+                z: Math.cos(angle) * (47 - row * 5)
+                scale: Qt.vector3d(.18, .12, .075)
+                eulerRotation.y: angle * 180 / Math.PI
+                tint: Qt.lighter(dragon.bodyColor, 1.3)
+            }
+        }
         Repeater3D {
             model: 2
             Node {
@@ -137,13 +139,16 @@ Node {
                 readonly property real side: index === 0 ? -1 : 1
                 x: side * 45; y: 8; z: 46
                 // Black sockets, luminous irises, slit pupils, catchlights.
-                Orb { scale: Qt.vector3d(.57, dragon.asleep ? .075 : .68, .25); tint: "#05070b" }
+                Orb { scale: Qt.vector3d(.57, .68 * dragon.blink, .25); tint: "#05070b" }
                 Node {
-                    visible: !dragon.asleep
+                    scale.y: dragon.blink
                     Orb { z: 9; scale: Qt.vector3d(.43, .53, .21); tint: "#b9ced7"; shine: .12 }
-                    Orb { z: 19; scale: Qt.vector3d(.36, .48, .14); tint: dragon.eyeColor; shine: .18 }
-                    Orb { z: 24; scale: Qt.vector3d(.10, .34, .06); tint: "#02060c"; shine: .1 }
-                    Orb { x: -7; y: 12; z: 28; scale: Qt.vector3d(.09, .11, .055); tint: "#ffffff"; shine: .05 }
+                    Node {
+                        x: dragon.lookX * 5; y: dragon.lookY * 4
+                        Orb { z: 19; scale: Qt.vector3d(.36, .48, .14); tint: dragon.eyeColor; shine: .18 }
+                        Orb { z: 24; scale: Qt.vector3d(.10, .34, .06); tint: "#02060c"; shine: .1 }
+                        Orb { x: -7; y: 12; z: 28; scale: Qt.vector3d(.09, .11, .055); tint: "#ffffff"; shine: .05 }
+                    }
                 }
                 Orb {
                     y: 26; z: 5
@@ -151,14 +156,25 @@ Node {
                     eulerRotation.z: side * 15
                     tint: dragon.bodyColor
                 }
-                Horn {
-                    x: side * 9; y: 59; z: -58
-                    scale: Qt.vector3d(.32, .64, .33)
-                    eulerRotation.z: -side * 22
-                    eulerRotation.x: -24
-                    tint: "#090c13"
-                }
             }
+        }
+        Repeater3D {
+            model: 2
+            Model {
+                required property int index
+                readonly property real side: index === 0 ? -1 : 1
+                x: side * 51; y: 45; z: -35
+                scale.x: side
+                geometry: CurvedHornGeometry {}
+                materials: PrincipledMaterial { baseColor: "#090c13"; roughness: .31; metalness: .1 }
+            }
+        }
+        Flame {
+            objectName: "flameEffect"
+            visible: dragon.mood === "roaring"
+            x: 17; y: -31; z: 112
+            clock: dragon.clock
+            strength: Math.sin(dragon.actionProgress * Math.PI)
         }
         // Forehead ridge with restrained blue accents.
         Repeater3D {

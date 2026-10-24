@@ -22,6 +22,14 @@ CHARACTERS = {
 }
 
 
+def clean_name(value):
+    """Nombres de una línea, sin controles ni caracteres invisibles."""
+    if not isinstance(value, str):
+        return ""
+    import unicodedata
+    return " ".join("".join(c for c in value if not unicodedata.category(c).startswith("C")).split())[:24]
+
+
 def clamp_position(x: int, y: int, width: int, height: int, bounds: tuple[int, int, int, int]):
     """Mantiene la ventana visible incluso en monitores con coordenadas negativas."""
     left, top, area_width, area_height = bounds
@@ -34,6 +42,7 @@ class Preferences:
         self.path = path
         self.character = "sombra"
         self.roaming = True
+        self.names = {}
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(data, dict):
@@ -41,11 +50,14 @@ class Preferences:
                     self.character = data["character"]
                 if isinstance(data.get("roaming"), bool):
                     self.roaming = data["roaming"]
+                if isinstance(data.get("names"), dict):
+                    self.names = {key: clean_name(value) for key, value in data["names"].items()
+                                  if key in CHARACTERS and clean_name(value)}
         except (OSError, ValueError):
             pass
 
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".tmp")
-        temporary.write_text(json.dumps({"character": self.character, "roaming": self.roaming}), encoding="utf-8")
+        temporary.write_text(json.dumps({"character": self.character, "roaming": self.roaming, "names": self.names}, ensure_ascii=False), encoding="utf-8")
         temporary.replace(self.path)
