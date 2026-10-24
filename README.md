@@ -31,7 +31,7 @@ Incluye **Sombra** (dragón negro y azul), **Brote** (dragón verde) y **Nimbo**
 
 ## Ejecutable portable para Windows
 
-En GitHub, abre **Actions → Crear Mascota para Windows**. Cada cambio del programa lanza una compilación; también puedes elegir **Run workflow**. Si la ejecución termina correctamente, descarga **Mascota-Windows** desde sus artefactos, extrae **todo** el ZIP y abre `Mascota.exe`. No muevas el `.exe` fuera de su carpeta `_internal`.
+En GitHub, abre **Actions → Crear Mascota para Windows**. Cada cambio del programa lanza una compilación; también puedes elegir **Run workflow**. Si la ejecución termina correctamente, descarga **Mascota-Windows** desde sus artefactos, extrae **todo** el ZIP y abre `Mascota.exe`. Conserva `Mascota.exe` junto a la carpeta `_internal`.
 
 Ese paquete no requiere instalar Python. Es una carpeta portable, aún no un instalador firmado. El flujo comprueba las pruebas, el renderizado y que el ejecutable empaquetado pueda dibujar un fotograma antes de ofrecer el artefacto.
 
