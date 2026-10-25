@@ -12,6 +12,7 @@ from PySide6.QtQuick import QQuickView, QQuickWindow, QSGRendererInterface
 from PySide6.QtQuickControls2 import QQuickStyle
 
 from .controller import PetController
+from .chat_window import ChatWindow
 from .domain import CHARACTERS, Preferences
 from .geometry import register_geometry
 
@@ -21,6 +22,7 @@ def main():
     parser.add_argument("--character", choices=CHARACTERS)
     parser.add_argument("--settings", type=Path, help="Ruta alternativa de preferencias")
     parser.add_argument("--capture", type=Path, help="Captura un fotograma 3D y sale")
+    parser.add_argument("--chat-capture", type=Path, help="Captura la ventana de conversación y sale")
     parser.add_argument("--smoke-test", action="store_true", help="Ejercita la interfaz real y sale")
     parser.add_argument("--pose", choices=("idle", "sleeping", "roaring", "jumping"), default="idle", help="Acción de la captura")
     args = parser.parse_args()
@@ -37,6 +39,7 @@ def main():
     surface.setDepthBufferSize(24)
     QSurfaceFormat.setDefaultFormat(surface)
     app = QGuiApplication(sys.argv[:1])
+    app.setQuitOnLastWindowClosed(False)
     app.setOrganizationName("Mascota")
     app.setApplicationName("Desktop AI Pet")
     failed = [False]
@@ -50,13 +53,14 @@ def main():
     sys.excepthook = callback_error
     register_geometry()
 
-    temporary_settings = tempfile.TemporaryDirectory(prefix="mascota-test-") if (args.capture or args.smoke_test) and not args.settings else None
+    automated = bool(args.capture or args.chat_capture or args.smoke_test)
+    temporary_settings = tempfile.TemporaryDirectory(prefix="mascota-test-") if automated and not args.settings else None
     default_dir = Path(temporary_settings.name) if temporary_settings else Path(QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation))
     path = args.settings or default_dir / "preferences.json"
     preferences = Preferences(path)
     if args.character:
         preferences.character = args.character
-    if args.capture or args.smoke_test:
+    if automated:
         preferences.roaming = False
     controller = PetController(preferences)
     view = QQuickView()
@@ -75,8 +79,14 @@ def main():
     controller.attach_window(view)
     view.show()
     controller.centerOnScreen()
+    assistant = ChatWindow(controller, app)
+    app.aboutToQuit.connect(assistant.shutdown)
+    view.visibilityChanged.connect(lambda _: app.quit() if not view.isVisible() else None)
+    if args.chat_capture:
+        if not assistant.open():
+            return 1
     poses = {"sleeping": controller.toggleSleep, "roaring": controller.roar, "jumping": controller.jump}
-    if args.pose != "idle" and (args.capture or args.smoke_test):
+    if args.pose != "idle" and automated:
         QTimer.singleShot(1100 if args.pose != "jumping" else 1450, poses[args.pose])
 
     # Do not claim readiness if QML loads but rendering fails or is empty.
@@ -91,6 +101,13 @@ def main():
         if args.capture:
             args.capture.parent.mkdir(parents=True, exist_ok=True)
             if not image.save(str(args.capture)):
+                app.exit(1)
+                return
+        if args.chat_capture:
+            chat_image = assistant.view.grabWindow()
+            args.chat_capture.parent.mkdir(parents=True, exist_ok=True)
+            if chat_image.isNull() or not chat_image.save(str(args.chat_capture)):
+                print('No se pudo renderizar la conversación', file=sys.stderr)
                 app.exit(1)
                 return
         if args.smoke_test:
@@ -126,14 +143,19 @@ def main():
                 assert Preferences(path).names["sombra"] == "Sombra de prueba"
                 controller.renameCharacter(original_name)
                 assert Preferences(path).character == "sombra"
-                print(json.dumps({"ok": True, "rendered_samples": nonempty, "characters": 3, "checks": ["QML", "3D render", "character switching", "sleep", "pet", "fly", "jump", "flame", "drag", "names", "preferences"]}))
+                assert assistant.open(check_connection=False)
+                assert assistant.view.status() == QQuickView.Ready
+                assert assistant.view.rootObject().findChild(object, 'sendChat') is not None
+                assistant.close()
+                assert view.isVisible() and not controller._chat_open
+                print(json.dumps({"ok": True, "rendered_samples": nonempty, "characters": 3, "checks": ["QML", "3D render", "character switching", "sleep", "pet", "fly", "jump", "flame", "drag", "names", "preferences", "chat window"]}))
             except Exception as error:
                 print(f"Smoke test falló: {error}", file=sys.stderr)
                 app.exit(1)
                 return
         app.quit()
 
-    if args.capture or args.smoke_test:
+    if automated:
         QTimer.singleShot(1800, capture)
         QTimer.singleShot(15000, lambda: app.exit(1))
     result = app.exec()

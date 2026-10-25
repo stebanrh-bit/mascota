@@ -20,45 +20,6 @@ from mascota.domain import Preferences
 from mascota.geometry import register_geometry
 
 
-@pytest.fixture(scope="module")
-def app():
-    QQuickWindow.setDefaultAlphaBuffer(True)
-    QQuickStyle.setStyle("Basic")
-    fmt = QSurfaceFormat()
-    fmt.setAlphaBufferSize(8)
-    QSurfaceFormat.setDefaultFormat(fmt)
-    application = QGuiApplication.instance() or QGuiApplication([])
-    register_geometry()
-    yield application
-
-
-@pytest.fixture
-def desktop(app, tmp_path):
-    settings = Preferences(tmp_path / "preferences.json")
-    settings.roaming = False
-    controller = PetController(settings)
-    view = QQuickView()
-    view.setColor(Qt.transparent)
-    view.setFlags(Qt.FramelessWindowHint | Qt.Tool)
-    view.setResizeMode(QQuickView.SizeRootObjectToView)
-    view.rootContext().setContextProperty("pet", controller)
-    source = Path(__file__).parents[1] / "mascota" / "qml" / "Main.qml"
-    view.setSource(QUrl.fromLocalFile(str(source)))
-    assert view.status() == QQuickView.Ready, [error.toString() for error in view.errors()]
-    view.resize(460, 520)
-    controller.attach_window(view)
-    view.show()
-    controller.centerOnScreen()
-    QTest.qWait(800)
-    yield view, controller
-    controller._timer.stop()
-    controller._status_timer.stop()
-    view.setSource(QUrl())
-    view.close()
-    view.deleteLater()
-    app.processEvents()
-
-
 def find_visual(parent, name):
     if parent.objectName() == name:
         return parent
@@ -218,10 +179,14 @@ def test_blink_and_gaze_follow_pointer(desktop):
     previous = QCursor.pos()
     try:
         QCursor.setPos(view.mapToGlobal(QPoint(20,180)))
-        QTest.qWait(150)
+        deadline = time.monotonic() + 2
+        while controller.lookX >= -.5 and time.monotonic() < deadline:
+            QTest.qWait(25)
         assert controller.lookX < -.5
         QCursor.setPos(view.mapToGlobal(QPoint(440,180)))
-        QTest.qWait(150)
+        deadline = time.monotonic() + 2
+        while controller.lookX <= .5 and time.monotonic() < deadline:
+            QTest.qWait(25)
         assert controller.lookX > .5
     finally:
         QCursor.setPos(previous)

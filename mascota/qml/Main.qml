@@ -135,16 +135,17 @@ Item {
         opacity: root.showControls ? 1 : .55
         Behavior on opacity { NumberAnimation { duration: 180 } }
         Repeater {
-            model: ["Acariciar", pet.petState === "sleeping" ? "Despertar" : "Dormir", "Personajes"]
+            model: ["Acariciar", "Dormir", "Personajes", "Hablar"]
             delegate: PetButton {
                 required property string modelData
                 required property int index
                 objectName: "action" + index
-                text: modelData
+                text: index === 1 && pet.petState === "sleeping" ? "Despertar" : modelData
                 onClicked: {
                     if (index === 0) pet.pet()
                     else if (index === 1) pet.toggleSleep()
-                    else menu.open()
+                    else if (index === 2) menu.open()
+                    else pet.openChat()
                 }
             }
         }

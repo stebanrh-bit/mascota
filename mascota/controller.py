@@ -15,6 +15,7 @@ class PetController(QObject):
     messageChanged = Signal()
     expressionChanged = Signal()
     lookChanged = Signal()
+    chatRequested = Signal()
 
     def __init__(self, preferences: Preferences):
         super().__init__()
@@ -24,6 +25,7 @@ class PetController(QObject):
         self._window = None
         self._dragging = False
         self._menu_open = False
+        self._chat_open = False
         self._last_tick = time.monotonic()
         self._next_action = self._last_tick + 10
         self._direction = 1
@@ -206,6 +208,25 @@ class PetController(QObject):
         if value and self._state in ("walking", "flying", "jumping", "held"):
             self._stop_motion()
 
+    @Slot()
+    def openChat(self):
+        self.chatRequested.emit()
+
+    def set_chat_open(self, value):
+        self._chat_open = value
+        if value or self._state == 'thinking':
+            self._stop_motion()
+        if not value:
+            self._next_action = time.monotonic() + 8
+
+    def set_chat_thinking(self, value):
+        if self._chat_open:
+            if value:
+                self._stop_motion()
+                self._set_state('thinking')
+            elif self._state == 'thinking':
+                self._stop_motion()
+
     @Slot(int, int)
     def moveBy(self, dx, dy):
         if self._window:
@@ -266,7 +287,7 @@ class PetController(QObject):
             self._clamp()
             if self._window.x() == old_x:
                 self._direction *= -1
-        elif self._state == "idle" and self.roaming and now >= self._next_action:
+        elif self._state == "idle" and self.roaming and not self._chat_open and now >= self._next_action:
             self._direction = random.choice((-1, 1))
             self._deadline = now + random.uniform(3, 5)
             self._set_state("walking")

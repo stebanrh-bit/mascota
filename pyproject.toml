@@ -1,12 +1,13 @@
 [project]
 name = "mascota-desktop"
-version = "0.2.0"
+version = "0.3.0"
 description = "Un dragon bebe 3D para tu escritorio"
 requires-python = ">=3.11,<3.14"
 dependencies = ["PySide6==6.9.3"]
 
 [dependency-groups]
 dev = ["pytest==8.4.2", "pyinstaller==6.16.0"]
+cloud-ai = ["zstandard==0.25.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

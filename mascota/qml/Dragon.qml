@@ -113,7 +113,7 @@ Node {
         id: head
         y: 74; z: 14
         eulerRotation.x: dragon.asleep ? 17 : -3 + Math.sin(dragon.clock * 1.3) * 2
-        eulerRotation.z: dragon.mood === "held" ? -12 : 0
+        eulerRotation.z: dragon.mood === "held" ? -12 : dragon.mood === "thinking" ? Math.sin(dragon.clock * 2) * 5 : 0
         eulerRotation.y: dragon.asleep ? 0 : dragon.lookX * 6
         Orb { scale: Qt.vector3d(1.58, 1.27, 1.14); tint: dragon.bodyColor }
         Orb { y: -25; z: 48; scale: Qt.vector3d(1.05, .61, .65); tint: dragon.bodyColor }

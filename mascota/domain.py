@@ -3,6 +3,8 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 
+from .ai import DEFAULT_MODEL, DEFAULT_URL, local_endpoint, model_name
+
 
 @dataclass(frozen=True)
 class Character:
@@ -43,6 +45,7 @@ class Preferences:
         self.character = "sombra"
         self.roaming = True
         self.names = {}
+        self.ai = {'url': DEFAULT_URL, 'model': DEFAULT_MODEL}
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(data, dict):
@@ -53,11 +56,17 @@ class Preferences:
                 if isinstance(data.get("names"), dict):
                     self.names = {key: clean_name(value) for key, value in data["names"].items()
                                   if key in CHARACTERS and clean_name(value)}
+                if isinstance(data.get('ai'), dict):
+                    try:
+                        self.ai = {'url': local_endpoint(data['ai'].get('url')),
+                                   'model': model_name(data['ai'].get('model'))}
+                    except ValueError:
+                        pass
         except (OSError, ValueError):
             pass
 
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".tmp")
-        temporary.write_text(json.dumps({"character": self.character, "roaming": self.roaming, "names": self.names}, ensure_ascii=False), encoding="utf-8")
+        temporary.write_text(json.dumps({"character": self.character, "roaming": self.roaming, "names": self.names, "ai": self.ai}, ensure_ascii=False), encoding="utf-8")
         temporary.replace(self.path)
