@@ -5,6 +5,7 @@ on:
     paths:
       - 'mascota/**'
       - 'tools/build_windows.py'
+      - 'tools/ci_summary.py'
       - 'run_pet.py'
       - 'requirements.txt'
       - 'tests/**'
@@ -28,7 +29,16 @@ jobs:
       - name: Pruebas automáticas
         env:
           QSG_RHI_PREFER_SOFTWARE_RENDERER: '1'
-        run: python -m pytest -q
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build | Out-Null
+          python -m pytest -q --junitxml=build/test-results.xml *> build/pytest-output.log
+          $pytestResult = $LASTEXITCODE
+          Get-Content build/pytest-output.log
+          exit $pytestResult
+      - name: Resumen de pruebas
+        if: always()
+        run: python tools/ci_summary.py
       - name: Comprobar personaje y conversación
         env:
           QSG_RHI_PREFER_SOFTWARE_RENDERER: '1'
