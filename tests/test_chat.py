@@ -37,15 +37,19 @@ def service():
         def log_message(self, *_): pass
         def do_GET(self):
             state.requests.append((self.path,None))
+            time.sleep(getattr(state,'probe_delay',0))
             if state.redirect:
                 self.send_response(302)
                 self.send_header('Location','https://example.invalid/no-se-debe-seguir')
                 self.end_headers()
                 return
-            self.send_response(200)
-            self.send_header('Content-Type','application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({'models':[{'name':name} for name in state.models]}).encode())
+            try:
+                self.send_response(200)
+                self.send_header('Content-Type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'models':[{'name':name} for name in state.models]}).encode())
+            except OSError:
+                pass  # A closed application cancels outstanding requests.
         def do_POST(self):
             body=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
             state.requests.append((self.path,body))
@@ -281,3 +285,24 @@ def test_settings_downloads_the_model_the_user_selected(desktop,service):
     finally:
         assistant.shutdown()
         assistant.view.deleteLater()
+
+
+@pytest.mark.parametrize('pending',[False,True],ids=['idle','pending-probe'])
+def test_exit_menu_closes_pet_chat_and_process(service,tmp_path,pending):
+    import subprocess
+    from pathlib import Path
+    service.probe_delay=5 if pending else 0
+    settings=Preferences(tmp_path/'settings.json')
+    settings.ai={'url':service.url,'model':'qwen2.5:0.5b'}
+    settings.save()
+    result=subprocess.run([
+        sys.executable,'-m','mascota','--smoke-test','--settings',str(settings.path),
+        '--capture',str(tmp_path/'pet.png'),'--chat-capture',str(tmp_path/'chat.png'),
+    ],cwd=Path(__file__).parents[1],capture_output=True,text=True,timeout=30)
+    assert result.returncode==0,result.stdout+'\n'+result.stderr
+    reports=[json.loads(line) for line in result.stdout.splitlines() if line.startswith('{')]
+    assert reports and reports[-1]['ok']
+    assert reports[-1]['windows_closed']
+    assert 'menu exit' in reports[-1]['checks']
+    if pending:
+        assert reports[-1]['pending_chat_at_exit']

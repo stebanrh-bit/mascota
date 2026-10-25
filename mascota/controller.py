@@ -46,6 +46,10 @@ class PetController(QObject):
         self._window = window
         self._timer.start()
 
+    def shutdown(self):
+        self._timer.stop()
+        self._status_timer.stop()
+
     @Property(str, notify=changed)
     def characterId(self):
         return self.preferences.character

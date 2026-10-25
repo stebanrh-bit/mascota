@@ -1,6 +1,6 @@
 # Mascota · Desktop AI Pet 🐉
 
-Un pequeño compañero **3D real** para el escritorio: **Sombra**, un dragón bebé de cuerpo negro, alas azules y dos pequeños colmillos. La versión **0.3** incorpora conversación con IA local mediante Ollama. No requiere claves de API para el modelo recomendado; una vez descargado, puede responder sin conexión a Internet.
+Un pequeño compañero **3D real** para el escritorio: **Sombra**, un dragón bebé de cuerpo negro, alas azules y dos pequeños colmillos. La versión **0.3.1** incluye conversación con IA local mediante Ollama y corrige el cierre desde **Salir** y **Esc**. No requiere claves de API para el modelo recomendado; una vez descargado, puede responder sin conexión a Internet.
 
 El personaje del prototipo está construido con geometría 3D y articulaciones animadas: alas suaves, cuernos y cola curvos, escamas en la frente, parpadeo y ojos que siguen el cursor. Las imágenes de `assets/` son referencias de diseño: el modelo actual es más sencillo y todavía no reproduce sus escamas detalladas.
 
@@ -17,6 +17,8 @@ El personaje del prototipo está construido con geometría 3D y articulaciones a
 3. Haz doble clic en **`iniciar.cmd`**. La primera vez descargará las dependencias; las siguientes arranca directamente.
 
 La mascota aparece sobre el escritorio, con fondo transparente y sin bordes. Para cerrarla, usa **clic derecho → Salir** o **Esc**. No hace falta abrir un navegador para usarla.
+
+**Salir** cierra la mascota y su ventana de conversación, cancela las solicitudes pendientes y detiene sus temporizadores. Ollama sigue siendo un programa independiente.
 
 ### Controles
 
@@ -48,6 +50,8 @@ Incluye **Sombra** (dragón negro y azul), **Brote** (dragón verde) y **Nimbo**
 El ejecutable de Mascota y Ollama son instalaciones separadas. Ollama debe estar activo en tu equipo para generar respuestas. También puedes elegir otro modelo local instalado desde Configurar. La conexión avanzada admite exclusivamente direcciones de este equipo, sin claves ni contraseñas.
 
 Las respuestas aparecen progresivamente y cada personaje mantiene su propia conversación durante la sesión. **Vaciar** borra la conversación del personaje actual; cerrar la aplicación termina el historial. Esta aplicación guarda la configuración, pero no el texto de los mensajes en disco. Cambiar de personaje o cerrar el chat cancela una respuesta pendiente y la mascota sigue abierta.
+
+El modelo ya viene entrenado: sus pesos no cambian al conversar. Usa el conocimiento del entrenamiento, la personalidad del personaje y hasta cuatro intercambios recientes completos para responder. Los nombres y ajustes se conservan; todavía no hay memoria permanente de conversaciones ni aprendizaje automático a partir del uso.
 
 `qwen2.5:0.5b` es una opción ligera; su calidad es limitada y sus respuestas pueden contener errores. La ventana de conversación no ejecuta acciones sobre archivos ni crea recordatorios.
 

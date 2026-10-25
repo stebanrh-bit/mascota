@@ -176,7 +176,7 @@ Item {
         PetMenuItem { objectName: "renameAction"; text: "Cambiar su nombre"; onTriggered: nameDialog.open() }
         PetMenuItem { text: "Volver al centro"; onTriggered: pet.centerOnScreen() }
         MenuSeparator {}
-        PetMenuItem { text: "Salir"; onTriggered: Qt.quit() }
+        PetMenuItem { objectName: "exitAction"; text: "Salir"; onTriggered: Qt.quit() }
     }
     Popup {
         id: nameDialog

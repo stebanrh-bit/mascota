@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 import tempfile
 
-from PySide6.QtCore import QStandardPaths, QTimer, Qt, QUrl
+from PySide6.QtCore import QMetaObject, QObject, QStandardPaths, QTimer, Qt, QUrl
 from PySide6.QtGui import QGuiApplication, QSurfaceFormat
 from PySide6.QtQuick import QQuickView, QQuickWindow, QSGRendererInterface
 from PySide6.QtQuickControls2 import QQuickStyle
@@ -65,6 +65,9 @@ def main():
         preferences.roaming = False
     controller = PetController(preferences)
     view = QQuickView()
+    qml_quit_seen = [False]
+    view.engine().quit.connect(lambda: qml_quit_seen.__setitem__(0, True))
+    view.engine().quit.connect(app.quit)
     view.setTitle("Mascota · tu compañero 3D")
     view.setFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
     view.setColor(Qt.transparent)
@@ -81,7 +84,12 @@ def main():
     view.show()
     controller.centerOnScreen()
     assistant = ChatWindow(controller, app)
-    app.aboutToQuit.connect(assistant.shutdown)
+    def shutdown():
+        controller.shutdown()
+        assistant.shutdown()
+        view.close()
+
+    app.aboutToQuit.connect(shutdown)
     view.visibilityChanged.connect(lambda _: app.quit() if not view.isVisible() else None)
     if args.chat_capture:
         if not assistant.open():
@@ -92,6 +100,14 @@ def main():
 
     # Do not claim readiness if QML loads but rendering fails or is empty.
     view.sceneGraphError.connect(lambda _error, message: (print(message, file=sys.stderr), failed.__setitem__(0, True), app.exit(1)))
+    smoke_report = {}
+
+    def smoke_exit():
+        smoke_report['pending_chat_at_exit'] = assistant.chat.busy
+        item = view.rootObject().findChild(QObject, 'exitAction')
+        if item is None or not QMetaObject.invokeMethod(item, 'triggered'):
+            failed[0] = True
+            app.exit(1)
 
     def capture():
         image = view.grabWindow()
@@ -149,17 +165,34 @@ def main():
                 assert assistant.view.rootObject().findChild(object, 'sendChat') is not None
                 assistant.close()
                 assert view.isVisible() and not controller._chat_open
-                print(json.dumps({"ok": True, "rendered_samples": nonempty, "characters": 3, "checks": ["QML", "3D render", "character switching", "sleep", "pet", "fly", "jump", "flame", "drag", "names", "preferences", "chat window"]}))
+                smoke_report.update({"rendered_samples": nonempty, "characters": 3, "checks": ["QML", "3D render", "character switching", "sleep", "pet", "fly", "jump", "flame", "drag", "names", "preferences", "chat window"]})
+                assert assistant.open()
+                QTimer.singleShot(100, smoke_exit)
             except Exception as error:
                 print(f"Smoke test falló: {error}", file=sys.stderr)
                 app.exit(1)
                 return
+            return  # Only the menu's QML quit signal may complete the smoke test.
         app.quit()
+
+    def startup_timeout():
+        failed[0] = True
+        print('La comprobación de arranque o salida excedió el tiempo disponible.', file=sys.stderr)
+        app.exit(1)
 
     if automated:
         QTimer.singleShot(1800, capture)
-        QTimer.singleShot(15000, lambda: app.exit(1))
+        QTimer.singleShot(15000, startup_timeout)
     result = app.exec()
+    if args.smoke_test:
+        closed = not view.isVisible() and not assistant.view.isVisible() and not assistant.chat.busy
+        success = bool(smoke_report) and result == 0 and not failed[0] and qml_quit_seen[0] and closed
+        smoke_report.update(ok=success, windows_closed=closed)
+        if success:
+            smoke_report['checks'].append('menu exit')
+        else:
+            failed[0] = True
+        print(json.dumps(smoke_report))
     # Destroy QML bindings before their Python context disappears.
     view.setSource(QUrl())
     if temporary_settings:
