@@ -18,6 +18,7 @@ from PySide6.QtTest import QTest
 from mascota.controller import PetController
 from mascota.domain import Preferences
 from mascota.geometry import register_geometry
+from mascota.rendering import logical_pixel
 
 
 def find_visual(parent, name):
@@ -49,11 +50,11 @@ def test_real_3d_render_and_character_selection_via_menu(desktop):
     view, controller = desktop
     first = view.grabWindow()
     assert not first.isNull()
-    geometry_pixels = sum(first.pixelColor(x,y).alpha() > 20 for x in range(60,400,8) for y in range(30,340,8))
+    geometry_pixels = sum(logical_pixel(first,x,y).alpha() > 20 for x in range(60,400,8) for y in range(30,340,8))
     assert geometry_pixels > 180
     # The 3D viewport must not paint over the companion's name or controls.
-    assert first.pixelColor(190,410).alpha() > 100
-    assert any(first.pixelColor(x,y).red() > 150 for x in range(195,270) for y in range(401,421))
+    assert logical_pixel(first,190,410).alpha() > 100
+    assert any(logical_pixel(first,x,y).red() > 150 for x in range(195,270) for y in range(401,421))
     # Camera rotation must change rendered geometry rather than a static picture.
     view.rootObject().setProperty("orbit", 30)
     QTest.qWait(150)
@@ -163,7 +164,7 @@ def test_jump_returns_to_origin_and_flame_is_rendered(desktop):
     assert effect is not None and effect.property('visible')
     after = view.grabWindow()
     def light_pixels(image):
-        return sum(image.pixelColor(x,y).alpha()>100 and image.pixelColor(x,y).green()>120
+        return sum(logical_pixel(image,x,y).alpha()>100 and logical_pixel(image,x,y).green()>120
                    for x in range(60,410,2) for y in range(40,330,2))
     assert light_pixels(after) > light_pixels(before) + 25
     controller.pet()

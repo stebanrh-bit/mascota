@@ -15,6 +15,7 @@ from .controller import PetController
 from .chat_window import ChatWindow
 from .domain import CHARACTERS, Preferences
 from .geometry import register_geometry
+from .rendering import logical_pixel
 
 
 def main():
@@ -94,7 +95,7 @@ def main():
 
     def capture():
         image = view.grabWindow()
-        if image.isNull() or image.width() < 400:
+        if image.isNull() or image.deviceIndependentSize().width() < 400:
             print("No se pudo renderizar la escena 3D", file=sys.stderr)
             app.exit(1)
             return
@@ -113,9 +114,9 @@ def main():
         if args.smoke_test:
             try:
                 # Rendered pixels must contain geometry above the interface labels.
-                nonempty = sum(image.pixelColor(x, y).alpha() > 20 for x in range(30, 430, 8) for y in range(30, 350, 8))
+                nonempty = sum(logical_pixel(image, x, y).alpha() > 20 for x in range(30, 430, 8) for y in range(30, 350, 8))
                 assert nonempty > 180, f"Escena vacía: {nonempty} píxeles"
-                assert image.pixelColor(190, 410).alpha() > 100, "Nombre no visible"
+                assert logical_pixel(image, 190, 410).alpha() > 100, "Nombre no visible"
                 assert controller.characterId == "sombra"
                 root = view.rootObject()
                 assert root.findChild(object, "petTouch") is not None

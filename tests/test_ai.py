@@ -25,7 +25,7 @@ def test_external_addresses_and_embedded_credentials_are_rejected(value):
     with pytest.raises(ValueError): local_endpoint(value)
 
 
-@pytest.mark.parametrize('value', ['', '../ secret', 'x' * 129, None])
+@pytest.mark.parametrize('value', ['', '../ secret', 'x' * 129, None], ids=['empty','spaces','too-long','missing'])
 def test_invalid_model_names_are_rejected(value):
     with pytest.raises(ValueError): model_name(value)
 
@@ -40,7 +40,7 @@ def test_stream_decoder_preserves_split_unicode_and_last_line():
     assert frames==[{'message':{'content':'¡Hola, dragón! 🐉'}},{'done':True}]
 
 
-@pytest.mark.parametrize('data', [b'{broken}\n', b'[]\n', b'\xff\n', b'x'*65537])
+@pytest.mark.parametrize('data', [b'{broken}\n', b'[]\n', b'\xff\n', b'x'*65537], ids=['invalid-json','wrong-type','invalid-utf8','oversized-frame'])
 def test_stream_decoder_rejects_invalid_or_unbounded_data(data):
     with pytest.raises(ValueError): JsonLines().feed(data)
 
@@ -60,7 +60,7 @@ def test_context_retains_only_complete_turns_and_personality():
     assert payload['stream'] is True
 
 
-@pytest.mark.parametrize('prompt',['', '  ', 'x'*2001, None])
+@pytest.mark.parametrize('prompt',['', '  ', 'x'*2001, None], ids=['empty','whitespace','too-long','missing'])
 def test_empty_or_oversized_questions_are_rejected(prompt):
     with pytest.raises(ValueError): chat_payload(DEFAULT_MODEL,'system',[],prompt)
 
