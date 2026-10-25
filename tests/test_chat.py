@@ -248,3 +248,36 @@ def test_chat_pauses_roaming_but_timed_expressions_still_finish(desktop):
     assert pet.petState=='thinking'
     pet.set_chat_open(False)
     assert pet.petState=='idle'
+
+
+def test_settings_downloads_the_model_the_user_selected(desktop,service):
+    _,pet=desktop
+    service.models=[]
+    assistant=ChatWindow(pet)
+    try:
+        assert assistant.chat.configure(service.url,'qwen2.5:0.5b')
+        assert assistant.open()
+        until(lambda:not assistant.chat.busy)
+        click(assistant.view,'configureChat')
+        field=find_visual(assistant.view.contentItem(),'modelField')
+        field.setProperty('text','another:latest')
+        QTest.qWait(50)
+        download=find_visual(assistant.view.contentItem(),'downloadChatModel')
+        assert not download.property('enabled')
+        assert not any(path=='/api/pull' for path,_ in service.requests)
+        click(assistant.view,'probeChat')
+        until(lambda:not assistant.chat.busy)
+        assert assistant.chat.modelName=='another:latest'
+        assert download.property('enabled')
+        settings=find_visual(assistant.view.contentItem(),'chatSettings')
+        content=settings.property('contentItem')
+        content.setProperty('contentY',max(0,content.property('contentHeight')-content.height()))
+        QTest.qWait(100)
+        click(assistant.view,'downloadChatModel')
+        until(lambda:not assistant.chat.busy)
+        assert assistant.chat.ready
+        pulls=[body for path,body in service.requests if path=='/api/pull']
+        assert pulls[-1]['model']=='another:latest'
+    finally:
+        assistant.shutdown()
+        assistant.view.deleteLater()

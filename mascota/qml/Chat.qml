@@ -7,6 +7,7 @@ Rectangle {
     width: 500; height: 700
     color: "#0d1420"
     property bool configuring: false
+    property bool settingsDirty: endpointField.text.trim() !== chat.endpoint || modelField.text.trim() !== chat.modelName
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 20
@@ -166,6 +167,7 @@ Rectangle {
                 }
             }
             ScrollView {
+                objectName: "chatSettings"
                 clip: true
                 contentWidth: availableWidth
                 ColumnLayout {
@@ -213,8 +215,15 @@ Rectangle {
                         objectName: "probeChat"
                         text: "Guardar y comprobar"
                         enabled: !chat.busy
-                        onClicked: { if (chat.configure(endpointField.text, modelField.text)) chat.checkConnection() }
+                        onClicked: {
+                            if (chat.configure(endpointField.text, modelField.text)) {
+                                endpointField.text = chat.endpoint
+                                modelField.text = chat.modelName
+                                chat.checkConnection()
+                            }
+                        }
                     }
+                    Text { Layout.fillWidth: true; visible: root.settingsDirty; text: "Guarda los cambios antes de descargar el modelo elegido."; color: "#d5bd92"; font.pixelSize: 12; wrapMode: Text.WordWrap }
                     Text { Layout.fillWidth: true; text: "3. Si todavía no tienes el modelo, descárgalo aquí."; color: "#bbcce2"; font.pixelSize: 13; wrapMode: Text.WordWrap }
                     Text {
                         Layout.fillWidth: true
@@ -222,7 +231,7 @@ Rectangle {
                         color: "#8198b5"; font.pixelSize: 12; wrapMode: Text.WordWrap
                     }
                     RowLayout {
-                        PetButton { objectName: "downloadChatModel"; text: "Descargar modelo"; enabled: chat.connected && !chat.busy; onClicked: chat.downloadModel() }
+                        PetButton { objectName: "downloadChatModel"; text: "Descargar modelo"; enabled: chat.connected && !chat.busy && !root.settingsDirty; onClicked: chat.downloadModel() }
                         PetButton { text: "Detener"; visible: chat.busy; onClicked: chat.cancel() }
                     }
                     ProgressBar {
