@@ -30,6 +30,13 @@ def find_visual(parent, name):
     return None
 
 
+def wait_until(predicate, timeout=2):
+    deadline = time.monotonic() + timeout
+    while not predicate() and time.monotonic() < deadline:
+        QTest.qWait(25)
+    assert predicate(), 'La animación no alcanzó el estado esperado'
+
+
 def click_item(view, name):
     item = find_visual(view.contentItem(), name)
     assert item is not None, name
@@ -171,22 +178,18 @@ def test_blink_and_gaze_follow_pointer(desktop):
     model = view.rootObject().findChild(QObject, 'dragonModel')
     view.rootObject().setProperty('animationEnabled', False)
     view.rootObject().setProperty('clock', 5.7)
-    QTest.qWait(100)
+    wait_until(lambda: model.property('blink') < .1)
     assert model.property('blink') < .1
     view.rootObject().setProperty('clock', 5.9)
-    QTest.qWait(100)
+    wait_until(lambda: model.property('blink') > .95)
     assert model.property('blink') > .95
     previous = QCursor.pos()
     try:
         QCursor.setPos(view.mapToGlobal(QPoint(20,180)))
-        deadline = time.monotonic() + 2
-        while controller.lookX >= -.5 and time.monotonic() < deadline:
-            QTest.qWait(25)
+        wait_until(lambda: controller.lookX < -.5)
         assert controller.lookX < -.5
         QCursor.setPos(view.mapToGlobal(QPoint(440,180)))
-        deadline = time.monotonic() + 2
-        while controller.lookX <= .5 and time.monotonic() < deadline:
-            QTest.qWait(25)
+        wait_until(lambda: controller.lookX > .5)
         assert controller.lookX > .5
     finally:
         QCursor.setPos(previous)
