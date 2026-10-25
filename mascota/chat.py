@@ -6,6 +6,7 @@ from PySide6.QtNetwork import QNetworkAccessManager, QNetworkProxy, QNetworkRepl
 
 from .ai import DEFAULT_MODEL, DEFAULT_URL, MAX_ANSWER, JsonLines, chat_payload, local_endpoint, model_name, personality
 from .domain import CHARACTERS
+from .memories import MemoryController
 
 
 class Conversation(QAbstractListModel):
@@ -85,6 +86,24 @@ class ChatController(QObject):
         self._timeout.timeout.connect(lambda: self._fail('La IA tardó demasiado. Puedes volver a intentarlo.'))
         self.timeout_ms = 120000
         pet.changed.connect(self._sync_identity)
+        self.memory = MemoryController(pet.preferences, lambda: not self.busy, self)
+        self.memory.contextReset.connect(self._reset_memory_context)
+        self.memory.notice.connect(self._memory_notice)
+
+    @Property(QObject, constant=True)
+    def memoryManager(self):
+        return self.memory
+
+    def _memory_notice(self, text):
+        self._status = text
+        self.changed.emit()
+
+    def _reset_memory_context(self, character):
+        if self._identity[0] == character and self._kind == 'chat':
+            self.cancel()
+        self._history[character].clear()
+        if self._identity[0] == character and self.messages.rowCount():
+            self.messages.append('notice', 'Recuerdos actualizados. Los próximos mensajes empiezan con un contexto nuevo.', 'notice')
 
     @Property(QObject, constant=True)
     def conversation(self):
@@ -136,6 +155,7 @@ class ChatController(QObject):
             self.cancel()
         self._identity = identity
         self.messages.use(self._conversations[identity[0]])
+        self.memory.select_character(identity[0])
         self.changed.emit()
 
     @Slot(str, str, result=bool)
@@ -212,7 +232,12 @@ class ChatController(QObject):
         who = CHARACTERS[self.pet.characterId]
         system = personality(self.pet.characterName, who.kind, who.description)
         try:
-            payload = chat_payload(self._model, system, self._history[self.pet.characterId], prompt)
+            memories = self.memory.facts()
+            if not self.memory.available:
+                self._status = 'La memoria local no está disponible. Abre Recuerdos y vuelve a intentarlo.'
+                self.changed.emit()
+                return False
+            payload = chat_payload(self._model, system, self._history[self.pet.characterId], prompt, memories)
         except ValueError as error:
             self._status = str(error)
             self.changed.emit()

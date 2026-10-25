@@ -306,3 +306,150 @@ def test_exit_menu_closes_pet_chat_and_process(service,tmp_path,pending):
     assert 'menu exit' in reports[-1]['checks']
     if pending:
         assert reports[-1]['pending_chat_at_exit']
+
+
+def test_saved_memory_is_used_after_restart_and_kept_per_character(client,service):
+    chat,pet=client
+    assert chat.memory.save(-1,'Mi color favorito es el turquesa.',pet.characterId)
+    restored_pet=PetController(Preferences(pet.preferences.path))
+    restored=ChatController(restored_pet)
+    try:
+        restored.checkConnection()
+        until(lambda:not restored.busy)
+        assert restored.memory.count==1
+        assert restored.send('¿Qué color me gusta?')
+        until(lambda:not restored.busy)
+        payload=[body for path,body in service.requests if path=='/api/chat'][-1]
+        assert 'turquesa' in payload['messages'][0]['content']
+        restored_pet.selectCharacter('nimbo')
+        assert restored.memory.count==0
+        assert restored.send('Hola')
+        until(lambda:not restored.busy)
+        payload=[body for path,body in service.requests if path=='/api/chat'][-1]
+        assert 'turquesa' not in json.dumps(payload['messages'])
+    finally:
+        restored.cancel()
+        restored_pet.shutdown()
+        restored.deleteLater()
+
+
+def test_deleting_memory_removes_it_from_future_payloads_and_old_context(client,service):
+    chat,pet=client
+    assert chat.memory.save(-1,'Mi color favorito es el turquesa.',pet.characterId)
+    key=chat.memory.items.rows[0]['id']
+    service.frames=[{'message':{'content':'Tu color es turquesa.'}},{'done':True}]
+    assert chat.send('¿Recuerdas mi preferencia turquesa?')
+    until(lambda:not chat.busy)
+    assert chat._history['sombra']
+    assert chat.memory.remove(key,pet.characterId)
+    assert chat._history['sombra']==[]
+    assert chat.messages.rows[-1]['speaker']=='notice'
+    assert chat.send('¿Qué recuerdas de mí?')
+    until(lambda:not chat.busy)
+    payload=[body for path,body in service.requests if path=='/api/chat'][-1]
+    assert 'turquesa' not in json.dumps(payload['messages'])
+
+
+def test_memory_pause_keeps_notes_but_stops_sending_them(client,service):
+    chat,pet=client
+    assert chat.memory.save(-1,'Me gusta pintar acuarelas.',pet.characterId)
+    assert chat.memory.setEnabled(False,pet.characterId)
+    assert chat.memory.count==1 and not chat.memory.enabled
+    assert chat.send('Hola')
+    until(lambda:not chat.busy)
+    payload=[body for path,body in service.requests if path=='/api/chat'][-1]
+    assert 'acuarelas' not in json.dumps(payload['messages'])
+    assert chat.memory.setEnabled(True,pet.characterId)
+    assert chat.send('Hola de nuevo')
+    until(lambda:not chat.busy)
+    payload=[body for path,body in service.requests if path=='/api/chat'][-1]
+    assert 'acuarelas' in payload['messages'][0]['content']
+
+
+def test_memory_cannot_change_during_reply_or_target_a_stale_character(client,service):
+    chat,pet=client
+    service.delay=.2
+    assert chat.send('Hola')
+    assert not chat.memory.save(-1,'Este dato no debe guardarse.','sombra')
+    chat.cancel()
+    assert chat.memory.count==0
+    assert chat.memory.save(-1,'Este dato pertenece a Sombra.','sombra')
+    key=chat.memory.items.rows[0]['id']
+    pet.selectCharacter('nimbo')
+    assert not chat.memory.remove(key,'sombra')
+    assert chat.memory.count==0
+    pet.selectCharacter('sombra')
+    assert chat.memory.count==1
+
+
+def test_external_memory_edits_reset_context_before_next_message(client,service):
+    from mascota.memory_store import MemoryStore
+    chat,pet=client
+    assert chat.memory.save(-1,'Mi color favorito es el azul.','sombra')
+    key=chat.memory.items.rows[0]['id']
+    assert chat.send('Recuerda azul')
+    until(lambda:not chat.busy)
+    outside=MemoryStore(pet.preferences.path.with_name('memories.sqlite3'))
+    outside.update('sombra',key,'Mi color favorito es el turquesa.')
+    assert chat.send('¿Qué color prefiero?')
+    until(lambda:not chat.busy)
+    payload=[body for path,body in service.requests if path=='/api/chat'][-1]
+    assert 'turquesa' in payload['messages'][0]['content']
+    assert 'azul' not in json.dumps(payload['messages'])
+
+
+def test_memory_panel_save_edit_delete_and_confirmation(desktop,service):
+    _,pet=desktop
+    assistant=ChatWindow(pet)
+    try:
+        assert assistant.chat.configure(service.url,'qwen2.5:0.5b')
+        assert assistant.open()
+        until(lambda:not assistant.chat.busy)
+        view=assistant.view
+        click(view,'openMemories')
+        click(view,'addMemory')
+        text=find_visual(view.contentItem(),'memoryText')
+        text.setProperty('text','Este dato no se guardará.')
+        click(view,'cancelMemoryEditor')
+        assert assistant.chat.memory.count==0
+        click(view,'addMemory')
+        text=find_visual(view.contentItem(),'memoryText')
+        text.setProperty('text','Mi color favorito es el azul.')
+        click(view,'saveMemory')
+        assert assistant.chat.memory.count==1
+        key=assistant.chat.memory.items.rows[0]['id']
+        click(view,'editMemory'+str(key))
+        text=find_visual(view.contentItem(),'memoryText')
+        text.setProperty('text','Mi color favorito es el turquesa.')
+        click(view,'saveMemory')
+        assert assistant.chat.memory.items.rows[0]['body']=='Mi color favorito es el turquesa.'
+        click(view,'deleteMemory'+str(key))
+        click(view,'cancelDeleteMemory')
+        assert assistant.chat.memory.count==1
+        click(view,'deleteMemory'+str(key))
+        click(view,'confirmDeleteMemory')
+        assert assistant.chat.memory.count==0
+    finally:
+        assistant.shutdown()
+        assistant.view.deleteLater()
+
+
+def test_remember_message_requires_explicit_save(desktop,service):
+    _,pet=desktop
+    assistant=ChatWindow(pet)
+    try:
+        assert assistant.chat.configure(service.url,'qwen2.5:0.5b')
+        assert assistant.open()
+        until(lambda:not assistant.chat.busy)
+        assert assistant.chat.send('Me gusta dibujar dragones.')
+        until(lambda:not assistant.chat.busy)
+        QTest.qWait(150)
+        click(assistant.view,'rememberMessage0')
+        text=find_visual(assistant.view.contentItem(),'memoryText')
+        assert text.property('text')=='Me gusta dibujar dragones.'
+        assert assistant.chat.memory.count==0
+        click(assistant.view,'saveMemory')
+        assert assistant.chat.memory.count==1
+    finally:
+        assistant.shutdown()
+        assistant.view.deleteLater()

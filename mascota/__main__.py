@@ -16,6 +16,7 @@ from .chat_window import ChatWindow
 from .domain import CHARACTERS, Preferences
 from .geometry import register_geometry
 from .rendering import logical_pixel
+from .memory_store import MemoryStore
 
 
 def main():
@@ -163,9 +164,23 @@ def main():
                 assert assistant.open(check_connection=False)
                 assert assistant.view.status() == QQuickView.Ready
                 assert assistant.view.rootObject().findChild(object, 'sendChat') is not None
+                assert assistant.chat.memory.available
+                assert assistant.view.rootObject().findChild(object, 'openMemories') is not None
+                # An isolated database also checks SQLite in the frozen executable.
+                with tempfile.TemporaryDirectory(prefix='mascota-memory-check-') as memory_dir:
+                    memory_path = Path(memory_dir) / 'memories.sqlite3'
+                    saved = MemoryStore(memory_path)
+                    key = saved.add('sombra', 'Mi color favorito es el turquesa.')
+                    restored = MemoryStore(memory_path)
+                    assert restored.snapshot('sombra')[2][0]['body'] == 'Mi color favorito es el turquesa.'
+                    assert restored.snapshot('nimbo')[2] == []
+                    restored.set_enabled('sombra', False)
+                    assert not saved.snapshot('sombra')[0]
+                    restored.remove('sombra', key)
+                    assert saved.snapshot('sombra')[2] == []
                 assistant.close()
                 assert view.isVisible() and not controller._chat_open
-                smoke_report.update({"rendered_samples": nonempty, "characters": 3, "checks": ["QML", "3D render", "character switching", "sleep", "pet", "fly", "jump", "flame", "drag", "names", "preferences", "chat window"]})
+                smoke_report.update({"rendered_samples": nonempty, "characters": 3, "checks": ["QML", "3D render", "character switching", "sleep", "pet", "fly", "jump", "flame", "drag", "names", "preferences", "chat window", "local memories"]})
                 assert assistant.open()
                 QTimer.singleShot(100, smoke_exit)
             except Exception as error:

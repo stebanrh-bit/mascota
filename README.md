@@ -1,6 +1,6 @@
 # Mascota · Desktop AI Pet 🐉
 
-Un pequeño compañero **3D real** para el escritorio: **Sombra**, un dragón bebé de cuerpo negro, alas azules y dos pequeños colmillos. La versión **0.3.1** incluye conversación con IA local mediante Ollama y corrige el cierre desde **Salir** y **Esc**. No requiere claves de API para el modelo recomendado; una vez descargado, puede responder sin conexión a Internet.
+Un pequeño compañero **3D real** para el escritorio: **Sombra**, un dragón bebé de cuerpo negro, alas azules y dos pequeños colmillos. La versión **0.4.0** añade recuerdos locales que tú eliges guardar para cada personaje y conserva la corrección de **Salir** y **Esc**. Conversa mediante Ollama sin claves de API para el modelo recomendado; una vez descargado, puede responder sin conexión a Internet.
 
 El personaje del prototipo está construido con geometría 3D y articulaciones animadas: alas suaves, cuernos y cola curvos, escamas en la frente, parpadeo y ojos que siguen el cursor. Las imágenes de `assets/` son referencias de diseño: el modelo actual es más sencillo y todavía no reproduce sus escamas detalladas.
 
@@ -49,17 +49,29 @@ Incluye **Sombra** (dragón negro y azul), **Brote** (dragón verde) y **Nimbo**
 
 El ejecutable de Mascota y Ollama son instalaciones separadas. Ollama debe estar activo en tu equipo para generar respuestas. También puedes elegir otro modelo local instalado desde Configurar. La conexión avanzada admite exclusivamente direcciones de este equipo, sin claves ni contraseñas.
 
-Las respuestas aparecen progresivamente y cada personaje mantiene su propia conversación durante la sesión. **Vaciar** borra la conversación del personaje actual; cerrar la aplicación termina el historial. Esta aplicación guarda la configuración, pero no el texto de los mensajes en disco. Cambiar de personaje o cerrar el chat cancela una respuesta pendiente y la mascota sigue abierta.
+Las respuestas aparecen progresivamente y cada personaje mantiene su propia conversación durante la sesión. **Vaciar** borra la conversación del personaje actual; cerrar la aplicación termina el historial. Cambiar de personaje o cerrar el chat cancela una respuesta pendiente y la mascota sigue abierta.
 
-El modelo ya viene entrenado: sus pesos no cambian al conversar. Usa el conocimiento del entrenamiento, la personalidad del personaje y hasta cuatro intercambios recientes completos para responder. Los nombres y ajustes se conservan; todavía no hay memoria permanente de conversaciones ni aprendizaje automático a partir del uso.
+El modelo ya viene entrenado: sus pesos no cambian al conversar. Usa el conocimiento del entrenamiento, la personalidad del personaje, los recuerdos que hayas activado y hasta cuatro intercambios recientes completos para responder. No aprende automáticamente de todo lo que escribes.
 
 `qwen2.5:0.5b` es una opción ligera; su calidad es limitada y sus respuestas pueden contener errores. La ventana de conversación no ejecuta acciones sobre archivos ni crea recordatorios.
+
+### Guardar recuerdos entre sesiones
+
+1. Abre **Hablar → Recuerdos → Nuevo recuerdo**.
+2. Escribe un dato breve, por ejemplo «Mi color favorito es el turquesa», y pulsa **Guardar**. También puedes pulsar **Recordar** junto a uno de tus mensajes y revisar el texto antes de guardarlo.
+3. Cierra y vuelve a abrir Mascota: ese personaje podrá usar el dato en las siguientes conversaciones.
+
+![Panel real de recuerdos locales](docs/recuerdos-locales.png)
+
+Cada personaje tiene hasta **12 recuerdos de 240 caracteres**. Puedes **Editar**, **Eliminar** con confirmación o desactivar **Usar recuerdos** para pausarlos sin borrarlos. Al editar, eliminar o pausar empieza un contexto de conversación nuevo para dejar de enviar datos anteriores; los mensajes previos siguen visibles hasta pulsar **Vaciar** o cerrar la aplicación. Pausar no impide que el modelo use información que vuelvas a escribir en un mensaje nuevo.
+
+Solo se guardan los datos que confirmas mediante **Guardar**, junto con tus ajustes. El historial de conversación no se guarda en disco. Los recuerdos están en `memories.sqlite3`, junto a `preferences.json`, en la carpeta de configuración del usuario (en Windows, normalmente `%LOCALAPPDATA%\Mascota\Desktop AI Pet`). Cambiar el ZIP del ejecutable conserva esa carpeta. Los datos se envían únicamente al Ollama de tu equipo cuando están activados; no se sincronizan con una cuenta ni reentrenan el modelo. El archivo no está cifrado, así que evita guardar contraseñas u otros secretos.
 
 ## Ejecutable portable para Windows
 
 En GitHub, abre **Actions → Crear Mascota para Windows**. Cada cambio del programa lanza una compilación; también puedes elegir **Run workflow**. Si la ejecución termina correctamente, descarga **Mascota-Windows** desde sus artefactos, extrae **todo** el ZIP y abre `Mascota.exe`. Conserva `Mascota.exe` junto a la carpeta `_internal`.
 
-Ese paquete no requiere instalar Python. Es una carpeta portable, aún no un instalador firmado. El flujo comprueba las pruebas, el renderizado y que el ejecutable empaquetado pueda abrir el personaje y la conversación antes de ofrecer el artefacto.
+Ese paquete no requiere instalar Python. Es una carpeta portable, aún no un instalador firmado. El flujo comprueba las pruebas, el renderizado, la persistencia de recuerdos y que el ejecutable empaquetado pueda abrir el personaje, la conversación y cerrarse desde **Salir** antes de ofrecer el artefacto.
 
 Para generarlo manualmente **en Windows**:
 
@@ -90,7 +102,7 @@ bash tools/setup-cloud.sh
 
 `tools/headless.py` crea una pantalla Xvfb solo durante el comando, usa Mesa/OpenGL y la cierra al terminar. No expone puertos de red. `setup-headless.sh` descarga Xvfb desde los repositorios Debian verificados y lo extrae en `/workspace/.cache`, sin instalar paquetes en el sistema. El archivo de dependencias y el código no se modifican durante el setup.
 
-Las pruebas comprueban renderizado 3D, controles, nombres, geometría y el contrato HTTP de Ollama contra un servidor local de prueba: fragmentos UTF-8, cancelación, tiempos de espera, errores, descargas y separación de conversaciones. En Linux sin pantalla se omiten las pruebas que necesitan Qt GUI; usa `headless.py` para ejecutar la suite completa. Esas pruebas de contrato no generan respuestas de IA.
+Las pruebas comprueban renderizado 3D, controles, nombres, geometría, recuerdos persistentes y el contrato HTTP de Ollama contra un servidor local de prueba: fragmentos UTF-8, cancelación, tiempos de espera, errores, descargas y separación de conversaciones. Cubren aislamiento por personaje, edición, borrado, pausa, escrituras fallidas y los botones reales de confirmación. En Linux sin pantalla se omiten las pruebas que necesitan Qt GUI; usa `headless.py` para ejecutar la suite completa. Esas pruebas de contrato no generan respuestas de IA.
 
 ### Validar la IA real en el entorno cloud
 
@@ -103,11 +115,12 @@ uv run --frozen --group cloud-ai python tools/setup_ollama.py
 bash tools/start-ollama.sh
 /workspace/.cache/ollama/bin/ollama pull qwen2.5:0.5b
 .venv/bin/python tools/headless.py .venv/bin/python -m mascota.check_ai --capture .local/chat-real.png
+.venv/bin/python tools/headless.py .venv/bin/python -m mascota.check_ai --memory-demo --capture .local/chat-memoria.png --memory-capture .local/recuerdos.png
 ```
 
 El helper verifica el SHA-256 del archivo oficial antes de extraer el runtime CPU a `/workspace/.cache/ollama`. La primera instalación descarga el archivo Linux oficial de unos 1,5 GB; conserva solo los componentes CPU y elimina el archivo comprimido después de verificarlo. Los modelos se conservan también en la caché; los procesos deben arrancarse de nuevo después de restaurar el entorno. Ollama crea su propia configuración local en la carpeta normal de usuario, sin cambiar `HOME`.
 
-La preparación del modelo necesita acceso a `registry.ollama.ai` y `dd20bb891979d25aebc8bec07b2b3bbc.r2.cloudflarestorage.com`. El runtime se descarga desde GitHub. `mascota.check_ai` exige una respuesta completada y no vacía del servicio real y devuelve `ok=true`; no sustituye el modelo con respuestas prefijadas.
+La preparación del modelo necesita acceso a `registry.ollama.ai` y `dd20bb891979d25aebc8bec07b2b3bbc.r2.cloudflarestorage.com`. El runtime se descarga desde GitHub. `mascota.check_ai` exige una respuesta completada y no vacía del servicio real y devuelve `ok=true`; no sustituye el modelo con respuestas prefijadas. Con `--memory-demo` guarda una preferencia de prueba en una base temporal, la recupera desde una instancia nueva y exige que el modelo responda con ese dato. No utiliza ni modifica los recuerdos del usuario.
 
 ## Alcance de esta versión
 
@@ -115,6 +128,7 @@ La preparación del modelo necesita acceso a `registry.ollama.ai` y `dd20bb89197
 - Ventana transparente sobre el escritorio y paseos dentro del área útil del monitor actual.
 - Tres personajes, nombres y preferencias locales.
 - Conversación por personaje con Ollama, respuestas progresivas, cancelación y preparación del modelo desde la interfaz.
+- Recuerdos locales elegidos por el usuario: guardado, edición, borrado y pausa independientes por personaje.
 - Preparación de paquete Windows con PyInstaller.
 
 La integración con el escritorio y las transparencias de Windows deben comprobarse también en un equipo Windows 11 real. La pantalla virtual de Linux no valida ese comportamiento específico. La inferencia real se ha probado en Linux; el flujo Windows prueba la interfaz y el protocolo con un servidor de prueba. Todavía no incluye voz, recordatorios, un modelo artístico detallado ni detección para sentarse sobre otras ventanas.

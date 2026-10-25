@@ -7,6 +7,7 @@ Rectangle {
     width: 500; height: 700
     color: "#0d1420"
     property bool configuring: false
+    property bool remembering: false
     property bool settingsDirty: endpointField.text.trim() !== chat.endpoint || modelField.text.trim() !== chat.modelName
     ColumnLayout {
         anchors.fill: parent
@@ -23,12 +24,19 @@ Rectangle {
                 Layout.fillWidth: true
                 spacing: 3
                 Text { text: "TU COMPAÑERO · IA LOCAL"; color: "#8096b5"; font.pixelSize: 10; font.letterSpacing: 1.4 }
-                Text { text: pet.characterName; textFormat: Text.PlainText; color: "#edf5ff"; font.pixelSize: 22; font.weight: Font.DemiBold }
+                Text { Layout.fillWidth: true; text: pet.characterName; textFormat: Text.PlainText; elide: Text.ElideRight; color: "#edf5ff"; font.pixelSize: 22; font.weight: Font.DemiBold }
+                Text { Layout.fillWidth: true; text: chat.memoryManager.summary; elide: Text.ElideRight; color: chat.memoryManager.available ? "#829cba" : "#e8b285"; font.pixelSize: 11 }
+            }
+            PetButton {
+                objectName: "openMemories"
+                text: root.remembering ? "Volver" : "Recuerdos"
+                onClicked: { root.configuring = false; root.remembering = !root.remembering; chat.memoryManager.refresh() }
             }
             PetButton {
                 objectName: "configureChat"
                 text: root.configuring ? "Volver" : "Configurar"
                 onClicked: {
+                    root.remembering = false
                     root.configuring = !root.configuring
                     if (root.configuring) { endpointField.text = chat.endpoint; modelField.text = chat.modelName }
                 }
@@ -38,7 +46,7 @@ Rectangle {
         StackLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            currentIndex: root.configuring ? 1 : 0
+            currentIndex: root.configuring ? 1 : root.remembering ? 2 : 0
             ColumnLayout {
                 spacing: 10
                 Item {
@@ -58,6 +66,7 @@ Rectangle {
                         onCountChanged: { followTail = true; Qt.callLater(positionViewAtEnd) }
                         ScrollBar.vertical: ScrollBar {}
                         delegate: Item {
+                            required property int index
                             required property string speaker
                             required property string body
                             required property string messageState
@@ -69,14 +78,14 @@ Rectangle {
                                 width: messages.width * .91
                                 height: contents.implicitHeight + 24
                                 radius: 15
-                                color: speaker === "user" ? "#173b65" : "#192435"
+                                color: speaker === "notice" ? "#111b2a" : speaker === "user" ? "#173b65" : "#192435"
                                 border.color: messageState === "error" ? "#b98348" : "#2b3c53"
                                 Column {
                                     id: contents
                                     x: 12; y: 12; width: parent.width - 24
                                     spacing: 6
                                     Text {
-                                        text: speaker === "user" ? "TÚ" : pet.characterName.toUpperCase()
+                                        text: speaker === "notice" ? "CHARLA NUEVA" : speaker === "user" ? "TÚ" : pet.characterName.toUpperCase()
                                         textFormat: Text.PlainText
                                         color: "#91abcb"; font.pixelSize: 10; font.letterSpacing: 1
                                     }
@@ -92,6 +101,13 @@ Rectangle {
                                         selectionColor: "#356ba4"
                                         font.pixelSize: 14
                                         background: null
+                                    }
+                                    PetButton {
+                                        objectName: "rememberMessage" + index
+                                        text: "Recordar"
+                                        visible: speaker === "user"
+                                        enabled: !chat.busy && chat.memoryManager.available
+                                        onClicked: memories.openEditor(-1, body)
                                     }
                                 }
                             }
@@ -123,8 +139,9 @@ Rectangle {
                         }
                         Text {
                             width: parent.width
-                            text: "El historial se conserva durante esta sesión."
+                            text: "Los mensajes duran esta sesión. Tú eliges qué guardar en Recuerdos."
                             horizontalAlignment: Text.AlignHCenter
+                            wrapMode: Text.WordWrap
                             color: "#617995"; font.pixelSize: 11
                         }
                     }
@@ -244,6 +261,13 @@ Rectangle {
                     Item { Layout.preferredHeight: 12 }
                 }
             }
+            MemoryPanel {
+                id: memories
+                store: chat.memoryManager
+                companion: pet
+                busy: chat.busy
+                dialogParent: root
+            }
         }
         Rectangle {
             Layout.fillWidth: true
@@ -261,5 +285,5 @@ Rectangle {
             }
         }
     }
-    Shortcut { sequence: "Escape"; onActivated: { if (root.configuring) root.configuring = false; else chatWindow.close() } }
+    Shortcut { sequence: "Escape"; onActivated: { if (memories.dialogOpen) memories.closeDialog(); else if (root.configuring) root.configuring = false; else if (root.remembering) root.remembering = false; else chatWindow.close() } }
 }

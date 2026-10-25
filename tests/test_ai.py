@@ -78,3 +78,23 @@ def test_ai_preferences_survive_and_never_store_messages(tmp_path):
     assert set(data)=={'character','roaming','names','ai'}
     path.write_text('{"ai":{"url":"https://outside.example","model":"qwen2.5:0.5b"}}')
     assert Preferences(path).ai=={'url':DEFAULT_URL,'model':DEFAULT_MODEL}
+
+
+def test_saved_memories_are_supplied_without_mutating_the_model_or_history():
+    memories=['Mi color favorito es el turquesa.']
+    payload=chat_payload(DEFAULT_MODEL,'Eres Sombra.',[],'¿Cuál es mi color favorito?',memories)
+    assert 'turquesa' in payload['messages'][0]['content']
+    assert 'información de referencia' in payload['messages'][0]['content']
+    assert payload['messages'][-1]['content']=='¿Cuál es mi color favorito?'
+    assert memories==['Mi color favorito es el turquesa.']
+    assert payload['model']==DEFAULT_MODEL
+
+
+def test_saved_memory_budget_keeps_complete_recent_turns():
+    notes=[f'Dato {i}: '+('a'*220) for i in range(12)]
+    history=[{'role':'user','content':'x'*2500},{'role':'assistant','content':'y'*2500}]*4
+    payload=chat_payload(DEFAULT_MODEL,'Sistema',history,'Pregunta',notes)
+    assert all(note in payload['messages'][0]['content'] for note in notes)
+    roles=[message['role'] for message in payload['messages']]
+    assert roles==['system','user','assistant','user']
+    assert sum(len(message['content']) for message in payload['messages'])<13000
